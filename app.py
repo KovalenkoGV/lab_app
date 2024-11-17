@@ -1,5 +1,6 @@
-import streamlit as st
 import os
+
+import streamlit as st
 
 if "session_state" not in st.session_state:
     st.session_state.session_state = {'surname': '', 'name': '', 'patronymic': '', 'group': ''}

@@ -1,19 +1,15 @@
-import streamlit as st
 import os
-import shutil
 
+import streamlit as st
 from pathlib import Path
 
-# подключаем класс Datalist
 from datalist import Datalist
-
-os_sep = os.sep
 
 # Создаем экземпляр класса списка дисциплин
 disciplines = Datalist('disciplines.json')
 
 
-# Создание страницы лабораторной рваботы по выбранной дисциплине
+# Создание страницы лабораторной работы по выбранной дисциплине
 def create_page_lab(discipline_name):
     col1, col2 = st.columns([1, 4])
     with col1:
@@ -53,9 +49,10 @@ labs_work = read_list_lab(directories, 'lab*')
 lab_work = st.selectbox("Выберите лабораторную работу", labs_work)
 
 if st.sidebar.button("Приступить к работе"):
-    st.session_state.current_lab_info = [directories, lab_work]
-    st.session_state.current_lab_name = f'{directories}_{lab_work}'
+    if all([directories, lab_work]):
+        st.session_state.current_lab_info = [directories, lab_work]
+        st.session_state.current_lab_name = f'{directories}_{lab_work}'
 
-    st.session_state.go_to_current_lab = True
+        st.session_state.go_to_current_lab = True
 
-    st.rerun()
+        st.rerun()
