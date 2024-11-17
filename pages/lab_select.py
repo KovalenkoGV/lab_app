@@ -8,7 +8,6 @@ from datalist import Datalist
 # Создаем экземпляр класса списка дисциплин
 disciplines = Datalist('disciplines.json')
 
-
 # Создание страницы лабораторной работы по выбранной дисциплине
 def create_page_lab(discipline_name):
     col1, col2 = st.columns([1, 4])
