@@ -21,7 +21,6 @@ if 'current_lab_name' not in st.session_state:
 if 'go_to_current_lab' not in st.session_state:
     st.session_state.go_to_current_lab = False
 
-# sep = os.sep
 pages_dir = f'pages{os.sep}'
 
 # Инициализация пустого списка страниц

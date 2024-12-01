@@ -15,3 +15,5 @@ if os.path.exists(module_file_path):
     spec.loader.exec_module(lab_module)
 
     lab_module.run_lab()  # Вызов функции из загруженного модуля
+else:
+    st.title('Модуль лабораторной работы отсутствует!')

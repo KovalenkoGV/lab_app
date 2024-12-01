@@ -1,12 +1,12 @@
-import streamlit as st
-import matplotlib.pyplot as plt
 import random
 import os
+
+import streamlit as st
+import matplotlib.pyplot as plt
 import pandas as pd
 
 
 def run_lab():
-    sep = os.sep
     info_file = os.path.join(os.getcwd(), 'lab_dir', 'B1F05', 'lab_01', 'about_lab_01.txt')
     # content = '123'
     with open(info_file, 'r', encoding='utf-8') as file:
