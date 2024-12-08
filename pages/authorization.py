@@ -81,10 +81,3 @@ else:
     if st.sidebar.button("Выйти из учетной записи"):
         autorisation_off()
         st.rerun()
-
-with st.form("signin_form", border=True):
-    st.subheader("Sign in")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    if st.form_submit_button("Sign in", type='primary'):
-        pass
