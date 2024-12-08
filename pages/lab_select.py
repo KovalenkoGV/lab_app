@@ -20,11 +20,15 @@ def create_page_lab(discipline_name):
 # Чтение списка лабораторных работ по выбранной дисциплине
 #   labdirectory    - директория с лабораторными работами
 #   pattern         - фильтр выбора файлов лабораторных работ
+@st.cache_data
 def read_list_lab(labdirectory, pattern):
     current_lab_dir = os.path.join(os.getcwd(), 'lab_dir', labdirectory)
+    if not os.path.exists(current_lab_dir):
+        st.error(f"Директория {current_lab_dir} не существует")
+        return []
+
     filtered_files = [f.name.split('.')[0] for f in Path(current_lab_dir).glob(pattern)]
     return filtered_files
-
 
 def path_to_lab_work(labdirectory, labwork):
     return os.path.join(os.getcwd(), 'lab_dir', labdirectory, labwork)
@@ -51,7 +55,5 @@ if st.sidebar.button("Приступить к работе"):
     if all([directories, lab_work]):
         st.session_state.current_lab_info = [directories, lab_work]
         st.session_state.current_lab_name = f'{directories}_{lab_work}'
-
         st.session_state.go_to_current_lab = True
-
         st.rerun()

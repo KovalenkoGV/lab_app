@@ -18,7 +18,7 @@ class SinglePhaseRectifier:
     E0 = 12  # Выпрямленное напряжение, В
     I0 = 10  # Среднее значение выпрямленного тока, А
 
-    dEv = 1  # Падение напряжения на вентиле (диоде)
+    dEv = 0.7  # Падение напряжения на вентиле (диоде), В
 
     # расчетные параметры
     E0_h = 0  # выпрямленное напряжение при холостом ходе
@@ -90,7 +90,8 @@ class SinglePhaseRectifier:
 
 def run_lab():
     info_file = os.path.join(os.getcwd(), 'lab_dir', 'B1F05', 'lab_02', 'about_lab_02.txt')
-    st.write("Дисциплина:")
+    image_file = os.path.join(os.getcwd(), 'lab_dir', 'B1F05', 'lab_02', 'lab_02.png')
+    # st.write("Дисциплина:")
 
     with open(info_file, 'r', encoding='utf-8') as file:
         content = file.read()  # Читаем весь файл
@@ -111,8 +112,11 @@ def run_lab():
 
         rectifier = st.session_state.rectifier
 
+        st.header("Исследование нагрузочной характеристики мостовой схемы выпрямителя")
+        st.image(image_file)
+
         # Добавляем слайдер с сопротивлением нагрузки
-        r_load = st.slider("Сопротивление нагрузки, Ом", 0.50, 25.00, 25.00)
+        r_load = st.slider("Сопротивление нагрузки Rн, Ом", 0.50, 25.00, 25.00)
         # вычисляем и выводим значения тока и напряжения для заданной нагрузки
         i_u_load = np.array([rectifier.calc_u_i_on_load(r_load)], dtype=rectifier.dtype)
 
@@ -123,21 +127,25 @@ def run_lab():
             if st.button("Добавить в таблицу измерений"):
                 rectifier.i_u_array = np.append(rectifier.i_u_array, i_u_load, axis=0)
 
+        st.subheader("Результаты измерений")
+
         col1, col2 = st.columns([1, 3])
         with col1:
             st.write(rectifier.i_u_array)
         with col2:
-            if st.button('Построить график'):
+            # if st.button('Построить график'):
                 # Строим график
-                fig, ax = plt.subplots()
-                ax.plot(rectifier.i_u_array['Iн, A'], rectifier.i_u_array['Uн, V'], marker='o')
-                ax.set_ylabel('Напряжение на нагрузке')
-                ax.set_xlabel('Ток нагрузки')
-                ax.set_title('Нагрузочная характеристика')
-                # Добавляем сетку
-                ax.grid(True)
-                # Отображаем график
-                st.pyplot(fig)
-
+            fig, ax = plt.subplots()
+            ax.plot(rectifier.i_u_array['Iн, A'], rectifier.i_u_array['Uн, V'], marker='o')
+            ax.set_ylabel('Напряжение на нагрузке')
+            ax.set_xlabel('Ток нагрузки')
+            ax.set_title('Нагрузочная характеристика')
+            # Добавляем сетку
+            ax.grid(True)
+            # Отображаем график
+            st.pyplot(fig)
+        if st.button("Очистить данные измерений"):
+            rectifier.i_u_array = np.array([(0.0, rectifier.E0_h)], dtype=rectifier.dtype)
+            st.rerun()
     else:
         st.title("Контрольные вопросы")
