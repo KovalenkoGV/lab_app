@@ -32,7 +32,7 @@ class SinglePhaseBridgeRectifier:
         self.i_u_array = np.array([(0.0, self.E0_h)], dtype=self.dtype)
 
     def calc_param(self):
-        # Расчет параметров мостовой схемы выпрямителя без фильтра
+        """ Расчет параметров мостовой схемы выпрямителя без фильтра """
 
         # Определение габаритной мощности трансформатора:
         P_gab = 1.23 * 1.1 * self.E0 * self.I0
