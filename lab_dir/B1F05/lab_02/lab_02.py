@@ -1,24 +1,20 @@
-import random
 import os
 
 import streamlit as st
 import numpy as np
-from numpy.lib import recfunctions as rfn
-import pandas as pd
 import matplotlib.pyplot as plt
 
 
-# from in_param import *
-
-class SinglePhaseRectifier:
+class SinglePhaseBridgeRectifier:
+    """ Класс описывающий работу однофазной мостовой схемы выпрямителя """
     # заданные параметры
     U_in = 220  # Напряжение первичной обмотки трансформатора, В
     f = 50  # частота питающей сети, Гц
-
     E0 = 12  # Выпрямленное напряжение, В
     I0 = 10  # Среднее значение выпрямленного тока, А
-
     dEv = 0.7  # Падение напряжения на вентиле (диоде), В
+    i_diode_max = 10  # Допустимый ток через диод, А
+    u_reverse_diode_max = 50  # Допустимое обратное напряжение на диоде, В
 
     # расчетные параметры
     E0_h = 0  # выпрямленное напряжение при холостом ходе
@@ -34,25 +30,25 @@ class SinglePhaseRectifier:
     def __init__(self):
         self.calc_param()
         self.i_u_array = np.array([(0.0, self.E0_h)], dtype=self.dtype)
-        # self.i_u_array = np.append(self.i_u_array, [i_u_load])
 
     def calc_param(self):
         # Расчет параметров мостовой схемы выпрямителя без фильтра
-        I0v = self.I0 / 2
-        Uobr = 1.57 * 1.1 * self.E0
 
-        # Габаритная мощность трансформатора приблизительно равна:
-        P_gab = 1.11 * 1.1 * self.E0 * self.I0
+        # Определение габаритной мощности трансформатора:
+        P_gab = 1.23 * 1.1 * self.E0 * self.I0
         # из табл. 1.2 определяем максимальную
         # индукцию в сердечнике трансформатора
-        B_m = 1.3
+        B_m = 1.55
 
         # Находим сопротивление обмоток трансформатора, Ом
         s = 2  # для стержневого трансформатора
-        r_tr = 5.2 * (self.E0 / (self.I0 * self.f * B_m)) * pow(s * self.f * B_m / (self.E0 * self.I0), 1 / 4)
+        r_tr = (5.2 * (self.E0 / (self.I0 * self.f * B_m)) *
+                pow(s * self.f * B_m / (self.E0 * self.I0), 1 / 4))
 
-        # Опреднляем индуктивность рассеяния обмоток, приведенную к фазе вторичной обмотки, гн
-        Ls = 6.4e-3 * s * (self.E0 / (self.I0 * self.f * B_m)) * 1 / pow(2 * self.f * B_m / (self.E0 * self.I0), 1 / 4)
+        # Определяем индуктивность рассеяния обмоток,
+        # приведенную к фазе вторичной обмотки, гн
+        Ls = (6.4e-3 * s * (self.E0 / (self.I0 * self.f * B_m)) *
+              1 / pow(2 * self.f * B_m / (self.E0 * self.I0), 1 / 4))
 
         # Находим падение напряжения на активном сопротивлении трансформатора
         dEr = self.I0 * r_tr
@@ -63,14 +59,13 @@ class SinglePhaseRectifier:
         # Определяем падение напряжения на вентилях в схеме
         dEv_sh = 2 * self.dEv
 
-        # Ориентировочное значение падения напряжения на дросселе в зависимости от P0=E0*I0 Вт определяем из табл.1.3
-        dE_dr = 0.035 * self.E0
-
         # Находим выпрямленное напряжение при холостом ходе
-        self.E0_h = self.E0 + dEr + dE_h + dEv_sh + dE_dr
+        self.E0_h = self.E0 + dEr + dE_h + dEv_sh
 
-        # Уточняем значение обратного напряжения на вентиле
-        U_obr = 1.05 * self.E0_h
+        # Расчет параметров мостовой схемы выпрямителя без фильтра
+        I0v = self.I0 / 2
+        # значение обратного напряжения на вентиле
+        U_obr = 1.57 * self.E0_h
 
         # Вычисляем ЭДС фазы вторичной обмотки
         U2h = 1.11 * self.E0_h
@@ -87,6 +82,21 @@ class SinglePhaseRectifier:
         u_load = self.E0_h - i_load * self.Rv
         i_u_load = (i_load, u_load)
         return i_u_load
+
+    def calc_min_max_nom_Rload(self, k_Rmin: float, k_Rmax: float):
+        # k_Rmin < 1 - коэффициент для расчета минимального значения Rн
+        # k_Rmax > 1 - коэффициент для расчета максимального значения Rн
+        Rnom = self.E0 / self.I0
+        Rmin = Rnom * k_Rmin
+        Rmax = Rnom * k_Rmax
+        return Rmin, Rmax, Rnom
+
+    def check_overcurrent(self, i_load: float):
+        """ Проверка перегрузки по допустимому току через диод"""
+        if i_load / 2 > self.i_diode_max:
+            return False
+        else:
+            return True
 
 def run_lab():
     info_file = os.path.join(os.getcwd(), 'lab_dir', 'B1F05', 'lab_02', 'about_lab_02.txt')
@@ -108,15 +118,16 @@ def run_lab():
     elif option == "Исследование нагрузочной характеристики":
         # создаем экземпляр класса Выпрямитель и инициализируем его в сессионном состоянии
         if 'rectifier' not in st.session_state:
-            st.session_state.rectifier = SinglePhaseRectifier()
+            st.session_state.rectifier = SinglePhaseBridgeRectifier()
 
         rectifier = st.session_state.rectifier
 
-        st.header("Исследование нагрузочной характеристики мостовой схемы выпрямителя")
+        st.header("Исследование нагрузочной характеристики мостовой схемы выпрямителя без фильтра")
         st.image(image_file)
 
         # Добавляем слайдер с сопротивлением нагрузки
-        r_load = st.slider("Сопротивление нагрузки Rн, Ом", 0.50, 25.00, 25.00)
+        r_min, r_max, r_nom = rectifier.calc_min_max_nom_Rload(0.1, 3.00)
+        r_load = st.slider("Сопротивление нагрузки Rн, Ом", r_min, r_max, r_nom)
         # вычисляем и выводим значения тока и напряжения для заданной нагрузки
         i_u_load = np.array([rectifier.calc_u_i_on_load(r_load)], dtype=rectifier.dtype)
 
@@ -124,8 +135,12 @@ def run_lab():
         with col1:
             st.write(i_u_load)
         with col2:
-            if st.button("Добавить в таблицу измерений"):
-                rectifier.i_u_array = np.append(rectifier.i_u_array, i_u_load, axis=0)
+            if rectifier.check_overcurrent(float(i_u_load['Iн, A'])):
+                if st.button("Добавить в таблицу измерений"):
+                    rectifier.i_u_array = np.append(rectifier.i_u_array, i_u_load, axis=0)
+            else:
+                st.write("Превышен допустимый ток через диод!")
+                st.write("Увеличьте сопротивление нагрузки!")
 
         st.subheader("Результаты измерений")
 
