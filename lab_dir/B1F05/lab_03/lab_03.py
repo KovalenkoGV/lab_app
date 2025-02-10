@@ -10,22 +10,43 @@ from array import array
 class StepDownPulseVoltageStabilizer:
     """ Класс описывающий работу схемы понижающего импульсного стабилизатора """
 
+    def_param = {
+        "def_U_in": 12.0,  # Входное напряжение (В)
+        "def_U_out": 9.0,  # Выходное напряжение (В)
+        "def_delta_U_out": 0.05,  # Размах пульсаций выходного напряжения
+        "def_I_n": 1.0,  # Ток нагрузки (А)
+        "def_LIR": 0.2,  # Коэффициент тока дросселя
+        "def_F": 10000,  # Частота импульсов (Гц)
+        "def_t_sim": 0.005,  # Время моделирования (с)
+    }
+
     # Исходные параметры схемы 
-    U_in = 12.0  # Входное напряжение (В)
-    U_out = 9.0  # Выходное напряжение (В)
-    delta_U_out = 0.05  # Размах пульсаций выходного напряжения
-    I_n = 1  # Ток нагрузки (А)
+    U_in = def_param["def_U_in"]  # Входное напряжение (В)
+    U_out = def_param["def_U_out"]  # Выходное напряжение (В)
+    delta_U_out = def_param["def_delta_U_out"]  # Размах пульсаций выходного напряжения
+    I_n = def_param["def_I_n"]  # Ток нагрузки (А)
+    LIR = def_param["def_LIR"]  # Коэффициент тока дросселя
+    F = def_param["def_F"]  # Частота импульсов (Гц)
+
+    # Паразитные параметры
+    U_CE_sat = 0.2  # Падение на транзисторе
+    U_D_drop = 0.7  # Падение на диоде
 
     # Расчетные параметры
-    L = 0.0015  # Индуктивность (Гн)
-    C = 7.5e-05  # Емкость (Ф)
-    R = 5  # Сопротивление нагрузки (Ом)
-    t_i = 8.3e-05  # Время импульса
-    t_p = 1.7e-05  # Время интервала
-    T = t_i + t_p  # Период переключения (с)
+    L = 0.0  # Индуктивность (Гн)
+    C = 0.0  # Емкость (Ф)
+    R = 0.0  # Сопротивление нагрузки (Ом)
+    t_i = 0.0  # Время импульса
+    t_p = 0.0  # Время интервала
+    T = 0.0  # Период переключения (с)
 
-    t_sim = 0.002  # Время моделирования (с)
+    # Параметры моделирования
+    t_sim = def_param["def_t_sim"]  # Время моделирования (с)
     t = array('f')  # Временная ось
+
+    # Параметры визуализации
+    t_start = 0.0  # начальное время отображения (с)
+    t_stop = t_sim  # конечное время отображения (с)
 
     # Начальные условия
     I_L = 0.0  # Начальный ток через катушку (А)
@@ -45,6 +66,7 @@ class StepDownPulseVoltageStabilizer:
 
     def __init__(self):
         self.calc_param()
+        self.modeling()
 
     def clear_arr(self):
         """ Сброс начальных условий переходных процессов схемы 
@@ -67,25 +89,47 @@ class StepDownPulseVoltageStabilizer:
 
     def set_default_param(self):
         # Исходные параметры схемы
-        self.U_in = 12.0  # Входное напряжение (В)
-        self.U_out = 9.0  # Выходное напряжение (В)
-        self.delta_U_out = 0.05  # Размах пульсаций выходного напряжения
-        self.I_n = 1  # Ток нагрузки (А)
+        self.U_in = self.def_param["def_U_in"]  # Входное напряжение (В)
+        self.U_out = self.def_param["def_U_out"]  # Выходное напряжение (В)
+        self.delta_U_out = self.def_param["def_delta_U_out"]  # Размах пульсаций выходного напряжения
+        self.I_n = self.def_param["def_I_n"]  # Ток нагрузки (А)
+        self.F = self.def_param["def_F"]  # Частота импульсов (Гц)
+        self.LIR = self.def_param["def_LIR"]  # Коэффициент тока дросселя
 
         # Расчетные параметры
-        self.L = 0.0015  # Индуктивность (Гн)
-        self.C = 7.5e-05  # Емкость (Ф)
-        self.R = 5  # Сопротивление нагрузки (Ом)
-        self.t_i = 8.3e-05  # Время импульса
-        self.t_p = 1.7e-05  # Время интервала
-        self.T = self.t_i + self.t_p  # Период переключения (с)
+        self.calc_param()
 
+        # Параметры моделирования
         self.t_sim = 0.002  # Время моделирования (с)
 
+        # Параметры визуализации
+        self.t_start = 0.0  # начальное время отображения (с)
+        self.t_stop = self.t_sim  # конечное время отображения (с)
+
     def calc_param(self):
+        # Определяем расчетные параметры генератора сигналов переключения управляющего
+        # транзистора. C учетом падения напряжения на открытом транзисторе U_ce_nas
+        # и диоде U_d найдем соотношение t_i/t_p = k
+        k = (self.U_out + self.U_D_drop) / (self.U_in - self.U_CE_sat - self.U_out)
+        self.T = 1 / self.F
+        self.t_i = (self.T * k) / (k + 1)
+        self.t_p = self.T / (k + 1)
+
+        # Определяем номинальное сопротивление нагрузки
+        self.R = self.U_out / self.I_n
+
+        # Выберем значение коэффициента тока дросселя LIR = 0.3
+        # и определим величину индуктивности
+        self.L = (1 - self.U_out / self.U_in) * (self.U_out * self.T / (self.LIR * self.I_n))
+
+        # Найдем величину выходной емкости
+        self.C = (1 / 4 * self.T / self.delta_U_out) * self.LIR * self.I_n
+
+    def modeling(self):
         """ Расчет параметров схемы понижающего импульсного стабилизатора """
 
         # Расчет временных параметров
+        self.T = self.t_i + self.t_p  # Период переключения (с)
         dt = self.T / 1000  # Шаг по времени (с)
         t = np.arange(0, self.t_sim, dt)  # Временная ось
 
@@ -96,18 +140,18 @@ class StepDownPulseVoltageStabilizer:
             # Определение состояния ключа (включен/выключен)
             if (t[i] % self.T) < self.t_i:
                 # Ключ включен
-                dI_L_dt = (self.U_in - self.U_C) / self.L
+                dI_L_dt = (self.U_in - self.U_CE_sat - self.U_C) / self.L  # Учет падения на транзисторе
                 dU_C_dt = (self.I_L - self.U_C / self.R) / self.C
-                self.U_CE = 0.0  # Напряжение коллектор-эмиттер близко к нулю
-                self.U_D = self.U_in  # Напряжение на диоде равно входному напряжению
+                self.U_CE = self.U_CE_sat  # Напряжение коллектор-эмиттер равно падению на транзисторе
+                self.U_D = self.U_in - self.U_CE_sat  # Напряжение на диоде
                 self.I_in = self.I_L  # Входной ток равен току через катушку
                 self.I_D = 0.0  # Ток через диод равен нулю
             else:
                 # Ключ выключен
-                dI_L_dt = -self.U_C / self.L
+                dI_L_dt = (-self.U_C - self.U_D_drop) / self.L  # Учет падения на диоде
                 dU_C_dt = (self.I_L - self.U_C / self.R) / self.C
                 self.U_CE = self.U_in  # Напряжение коллектор-эмиттер равно входному напряжению
-                self.U_D = 0.0  # Напряжение на диоде близко к нулю
+                self.U_D = self.U_D_drop  # Напряжение на диоде равно падению на диоде
                 self.I_in = 0.0  # Входной ток равен нулю
                 self.I_D = self.I_L  # Ток через диод равен току через катушку
 
@@ -123,6 +167,35 @@ class StepDownPulseVoltageStabilizer:
             self.I_in_arr.append(self.I_in)
             self.I_D_arr.append(self.I_D)
 
+
+def on_change_init_param(stabilizer: StepDownPulseVoltageStabilizer):
+    stabilizer.U_in = st.session_state.last_U_in
+    stabilizer.U_out = st.session_state.last_U_out
+    stabilizer.delta_U_out = st.session_state.last_delta_U_out
+    stabilizer.I_n = st.session_state.last_I_n
+    stabilizer.LIR = st.session_state.last_LIR
+    stabilizer.F = st.session_state.last_F
+    stabilizer.calc_param()
+    stabilizer.clear_arr()
+    stabilizer.modeling()
+
+
+def on_change_calc_param(stabilizer: StepDownPulseVoltageStabilizer):
+    stabilizer.F = st.session_state.last_F
+    stabilizer.L = st.session_state.last_L
+    stabilizer.C = st.session_state.last_C
+    stabilizer.R = st.session_state.last_R
+    stabilizer.t_i = st.session_state.last_t_i
+    stabilizer.t_p = st.session_state.last_t_p
+    stabilizer.clear_arr()
+    stabilizer.modeling()
+    st.session_state.auto_calc_param = False
+
+
+def on_change_t_sim(stabilizer: StepDownPulseVoltageStabilizer):
+    stabilizer.t_sim = st.session_state.last_t_sim
+    stabilizer.clear_arr()
+    stabilizer.modeling()
 
 def run_lab():
     info_file = os.path.join(os.getcwd(), 'lab_dir', 'B1F05', 'lab_03', 'about_lab_03.txt')
@@ -148,48 +221,79 @@ def run_lab():
 
         stabilizer = st.session_state.stabilizer
 
-        # Ввод параметров схемы через боковую панель
-        st.sidebar.header("Параметры схемы")
-        stabilizer.U_in = st.sidebar.number_input("Входное напряжение (Uin), В", value=stabilizer.U_in)
-        stabilizer.U_out = st.sidebar.number_input("Выходное напряжение (Uout), В", value=stabilizer.U_out)
-        stabilizer.L = st.sidebar.number_input("Индуктивность (L), Гн", value=stabilizer.L, format="%0.6f")
-        stabilizer.C = st.sidebar.number_input("Емкость (C), Ф", value=stabilizer.C, format="%0.6f")
-        stabilizer.R = st.sidebar.number_input("Сопротивление нагрузки (R), Ом", value=stabilizer.R)
-        stabilizer.t_i = st.sidebar.number_input("Время импульса (t_i), с", value=stabilizer.t_i,
-                                                 format="%0.6f")  # Время импульса
-        stabilizer.t_p = st.sidebar.number_input("Время интервала (t_p), с", value=stabilizer.t_p,
-                                                 format="%0.6f")  # Время интервала
-        stabilizer.t_sim = st.sidebar.number_input("Время моделирования (t_sim), с", value=stabilizer.t_sim,
-                                                   format="%0.6f")
+        # Инициализация параметров в сессионном состоянии
+        if (('last_U_in', 'last_U_out', 'last_delta_U_out', 'last_I_n', 'last_LIR', 'last_F', 'last_L',
+             'last_C', 'last_R', 'last_t_i', 'last_t_p', 'last_t_start', 'last_t_stop', 'last_t_sim',)
+                not in st.session_state):
+            st.session_state.last_U_in = stabilizer.U_in
+            st.session_state.last_U_out = stabilizer.U_out
+            st.session_state.last_delta_U_out = stabilizer.delta_U_out
+            st.session_state.last_I_n = stabilizer.I_n
+            st.session_state.last_LIR = stabilizer.LIR
+            st.session_state.last_F = stabilizer.F
+            st.session_state.last_L = stabilizer.L
+            st.session_state.last_C = stabilizer.C
+            st.session_state.last_R = stabilizer.R
+            st.session_state.last_t_i = stabilizer.t_i
+            st.session_state.last_t_p = stabilizer.t_p
+            st.session_state.last_t_start = stabilizer.t_start
+            st.session_state.last_t_stop = stabilizer.t_stop
+            st.session_state.last_t_sim = stabilizer.t_sim
 
-        stabilizer.clear_arr()
-        stabilizer.calc_param()
+        if 'auto_calc_param' not in st.session_state:
+            st.session_state.auto_calc_param = True
+
+        # Ввод параметров схемы через боковую панель
+        with st.sidebar.expander("Номинальные исходные параметры схемы", expanded=True):
+            stabilizer.U_in = st.number_input("Входное напряжение (Uвх), В", key='last_U_in',
+                                              on_change=on_change_init_param, args=(stabilizer,))
+            stabilizer.U_out = st.number_input("Выходное напряжение (Uвых), В", key='last_U_out',
+                                               on_change=on_change_init_param, args=(stabilizer,))
+            stabilizer.delta_U_out = st.number_input("Размах пульсаций выходного напряжения, В", key='last_delta_U_out',
+                                                     on_change=on_change_init_param, args=(stabilizer,))
+            stabilizer.I_n = st.number_input("Ток нагрузки (Iн), A", key='last_I_n',
+                                             on_change=on_change_init_param, args=(stabilizer,))
+            stabilizer.LIR = st.number_input("Коэффициент тока дросселя", key='last_LIR',
+                                             on_change=on_change_init_param, args=(stabilizer,))
+            stabilizer.F = st.number_input("Частота преобразования (fпр), Гц", key='last_F',
+                                           on_change=on_change_init_param, args=(stabilizer,))
+            st.checkbox("Автоматически рассчитывать параметры схемы", key='auto_calc_param')
+
+        with st.sidebar.expander("Расчетные параметры схемы", expanded=False):
+            stabilizer.L = st.number_input("Индуктивность (L), Гн", key='last_L', format="%0.6f",
+                                           on_change=on_change_calc_param, args=(stabilizer,))
+            stabilizer.C = st.number_input("Емкость (C), Ф", key='last_C', format="%0.6f",
+                                           on_change=on_change_calc_param, args=(stabilizer,))
+            stabilizer.R = st.number_input("Сопротивление нагрузки (R), Ом", key='last_R', format="%0.2f",
+                                           on_change=on_change_calc_param, args=(stabilizer,))
+            stabilizer.t_i = st.number_input("Время импульса (t_i), с", key='last_t_i', format="%0.6f",
+                                             on_change=on_change_calc_param, args=(stabilizer,))
+            stabilizer.t_p = st.number_input("Время интервала (t_p), с", key='last_t_p', format="%0.6f",
+                                             on_change=on_change_calc_param, args=(stabilizer,))
+            if st.button("Пересчитать по исходным параметрам"):
+                stabilizer.calc_param()
+                stabilizer.clear_arr()
+                stabilizer.modeling()
+
+        stabilizer.t_sim = st.sidebar.number_input("Время моделирования (t_sim), с", key='last_t_sim', format="%0.6f",
+                                                   on_change=on_change_t_sim, args=(stabilizer,))
 
         st.header("Исследование импульсного стабилизатора напряжения понижающего типа")
         st.image(image_file)
 
-        # Добавляем слайдер с сопротивлением нагрузки
-        # r_min, r_max, r_nom = stabilizer.calc_min_max_nom_Rload(0.1, 3.00)
-        # r_load = st.slider("Сопротивление нагрузки Rн, Ом", r_min, r_max, r_nom)
-
-        # вычисляем и выводим значения тока и напряжения для заданной нагрузки
-        # i_u_load = np.array([stabilizer.calc_u_i_on_load(r_load)], dtype=stabilizer.dtype)
-
-        st.subheader("Результаты измерений")
-
-        # Построение графиков
-        st.markdown("**Ток через катушку, входной ток и ток через диод**")
+        st.subheader("Результаты моделирования работы схемы")
 
         # График тока через катушку
+        st.markdown("**Ток через катушку, входной ток и ток через диод**")
         fig1, ax1 = plt.subplots(figsize=(12, 3))
 
         ax1.plot(stabilizer.t, stabilizer.I_L_arr, label='Ток через катушку (I_L)', color='blue')
         ax1.plot(stabilizer.t, stabilizer.I_in_arr, label='Входной ток (I_in)', color='green', linestyle='--')
         ax1.plot(stabilizer.t, stabilizer.I_D_arr, label='Ток через диод (I_D)', color='red', linestyle='-.')
 
-        ax1.set_ylabel('Время (с)')
-        ax1.set_xlabel('Ток (А)')
-        ax1.set_title('Ток через катушку индуктивности')
+        ax1.set_xlabel('Время (с)')
+        ax1.set_ylabel('Ток (А)')
+        # ax1.set_title('Ток через катушку индуктивности')
         # Добавляем сетку
         ax1.grid(True)
         ax1.legend()
@@ -197,27 +301,24 @@ def run_lab():
         st.pyplot(fig1)
 
         # График напряжения на нагрузке
-        st.markdown("**Напряжение на нагрузке, напряжение коллектор-эмиттер и напряжение на диоде**")
-        fig2, ax2 = plt.subplots(figsize=(12, 4))
+        st.markdown("**Напряжение на нагрузке и напряжение на диоде**")
+        fig3, ax3 = plt.subplots(figsize=(12, 4))
 
-        ax2.plot(stabilizer.t, stabilizer.U_C_arr, label='Напряжение на нагрузке (U_C)', color='blue')
-        ax2.plot(stabilizer.t, stabilizer.U_CE_arr, label='Напряжение коллектор-эмиттер (U_CE)', color='green',
-                 linestyle='--')
-        # ax2.plot(stabilizer.t, stabilizer.U_D_arr, label='Напряжение на диоде (V_D)', color='red', linestyle='-.')
+        ax3.plot(stabilizer.t, stabilizer.U_C_arr, label='Напряжение на нагрузке (U_C)', color='blue')
+        ax3.plot(stabilizer.t, stabilizer.U_D_arr, label='Напряжение диоде U_VD', color='red', linestyle='-.')
 
-        ax2.set_ylabel('Время (с)')
-        ax2.set_xlabel('Напряжение (В)')
-        ax2.set_title('Напряжение на нагрузке')
+        ax3.set_xlabel('Время (с)')
+        ax3.set_ylabel('Напряжение (В)')
+        #ax3.set_title('Напряжение на нагрузке')
         # Добавляем сетку
-        ax2.grid(True)
-        ax2.legend()
+        ax3.grid(True)
+        ax3.legend()
         # Отображаем график
-        st.pyplot(fig2)
+        st.pyplot(fig3)
 
-        # if st.button("Вернуть параметры по умолчанию"):
-        #    stabilizer.set_default_param()
-        #    stabilizer.clear_arr()  
-        #    stabilizer.calc_param()
-        #    st.rerun()
+        with st.expander("Нажмите, чтобы задать временной фрагмент для просмотра графиков"):
+            st.markdown("**Данный функционал находится в разработке**")
+
+
     else:
         st.title("Контрольные вопросы")
